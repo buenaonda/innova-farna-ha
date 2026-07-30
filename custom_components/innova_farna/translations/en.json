@@ -1,0 +1,27 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Innova FÄRNA",
+        "description": "Sign in with your Innova app account.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid email or password.",
+      "cannot_connect": "Could not reach the Innova cloud."
+    },
+    "abort": {
+      "already_configured": "This Innova account is already configured."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "air_temperature": { "name": "Ambient temperature" },
+      "air_humidity": { "name": "Ambient humidity" }
+    }
+  }
+}

@@ -1,0 +1,43 @@
+"""Constants and enum mappings for the Innova FÄRNA integration."""
+from __future__ import annotations
+
+from datetime import timedelta
+
+from homeassistant.components.climate import HVACMode
+from homeassistant.components.climate.const import FAN_AUTO, FAN_HIGH, FAN_LOW, FAN_MEDIUM
+
+DOMAIN = "innova_farna"
+
+CONF_EMAIL = "email"
+CONF_PASSWORD = "password"
+CONF_TOKEN = "token"
+
+# Polling interval. The unit only answers while connected to the Innova cloud;
+# the coordinator tolerates "device offline" between polls.
+SCAN_INTERVAL = timedelta(seconds=60)
+
+MANUFACTURER = "Innova"
+
+MIN_TEMP = 16.0
+MAX_TEMP = 31.0
+TARGET_TEMP_STEP = 0.5
+
+# --- Enum mappings ---------------------------------------------------------
+# NOTE: the numeric protobuf enum values below are BEST-EFFORT and must be
+# confirmed against a live device (GetState). Adjust here once verified.
+HVAC_MODE_TO_HA: dict[int, HVACMode] = {
+    1: HVACMode.HEAT,
+    2: HVACMode.COOL,
+    3: HVACMode.DRY,
+    4: HVACMode.FAN_ONLY,
+    5: HVACMode.AUTO,
+}
+HA_TO_HVAC_MODE: dict[HVACMode, int] = {v: k for k, v in HVAC_MODE_TO_HA.items()}
+
+FAN_TO_HA: dict[int, str] = {
+    1: FAN_AUTO,
+    2: FAN_LOW,
+    3: FAN_MEDIUM,
+    4: FAN_HIGH,
+}
+HA_TO_FAN: dict[str, int] = {v: k for k, v in FAN_TO_HA.items()}

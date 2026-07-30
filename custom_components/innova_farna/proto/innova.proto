@@ -1,0 +1,131 @@
+// Innova FÄRNA / v2 cloud gRPC protocol.
+// Reverse-engineered from the Android app tech.solutiontech.innova v3.0.0.
+// Service: services.app.AppService  @  v2.grpc.innova.solutiontech.tech:443 (TLS)
+// Auth: metadata "authorization: Bearer <JWT>" (token from the REST login).
+//
+// NOTE: hvac_mode / fan_speed enum VALUES are best-effort and must be confirmed
+// against a live device (GetState). Field numbers/types are taken from the app's
+// protobuf-lite newMessageInfo descriptors.
+syntax = "proto3";
+
+package services.app;
+
+// ---- Request wrapper (app class pw4) ----
+message DeviceRequest {
+  bytes  mac_address = 1;   // 6 raw bytes, e.g. E4 B3 23 8E 64 84  (NOT the ascii string)
+  uint32 node_id     = 2;
+  Command request    = 3;
+}
+
+// ---- Command: oneof by device family (app class yl0) ----
+message Command {
+  oneof type {
+    SystemCommand    system     = 1;
+    SharedCommand    shared     = 2;   // get_state lives here
+    AcCommand        ac         = 3;   // air conditioner (the studio unit)
+    ButlerCommand    butler     = 4;
+    FancoilCommand   fancoil    = 5;
+    ThermostatCommand thermostat= 6;
+    HeatpumpCommand  heatpump   = 7;
+  }
+}
+
+message SystemCommand {
+  oneof type {
+    Empty reboot          = 1;
+    Empty update_firmware = 2;
+  }
+}
+
+// app class mg4
+message SharedCommand {
+  oneof type {
+    Empty       get_state          = 1;
+    SetNodes    set_nodes          = 2;
+    Empty       set_operation_mode = 3;
+  }
+}
+message SetNodes { repeated Node nodes = 1; }
+message Node { uint32 id = 1; }
+
+// app class ig4  (AC command)
+message AcCommand {
+  oneof type { AcSetState set_state = 1; }
+}
+message AcSetState {
+  optional bool  power               = 1;
+  optional float temperature_setpoint = 2;
+  optional AcHvacMode hvac_mode      = 3;
+  optional AcFanSpeed fan_speed      = 4;
+  optional bool  flap_swing          = 5;
+  optional bool  erv                 = 6;
+  optional bool  silent_mode         = 7;
+}
+
+// Placeholder command messages for the other device families (not implemented yet)
+message ButlerCommand    { }
+message FancoilCommand   { AcSetState set_state = 1; }
+message ThermostatCommand{ }
+message HeatpumpCommand  { }
+
+message Empty {}
+
+// ---- Response (app class hd1) ----
+message DeviceResponse {
+  ErrorInfo error   = 1;
+  DeviceState device = 2;   // oneof by family
+  string    service = 3;
+}
+message ErrorInfo { int32 code = 1; string message = 2; }
+
+message DeviceState {
+  oneof type {
+    Empty   shared     = 1;
+    AcState ac         = 2;   // <-- studio AC state
+    AcState fancoil    = 3;
+    Empty   butler     = 4;
+    Empty   thermostat = 5;
+    Empty   heatpump   = 6;
+  }
+}
+
+// app class up1/zp1/kp1 (AC state).
+// temperature_setpoint modeled as float; if the wire shows a wrapper, adjust.
+message AcState {
+  uint32 alarms               = 1;
+  bool   power                = 2;
+  float  temperature_setpoint = 3;
+  float  air_temperature      = 4;   // real ambient temperature
+  AcHvacMode hvac_mode        = 5;
+  AcFanSpeed fan_speed        = 6;
+  bool   flap_swing           = 7;
+  uint32 operation_mode       = 8;
+  float  air_humidity         = 9;
+}
+
+// TODO: confirm numeric values live via GetState.
+enum AcHvacMode {
+  HVAC_MODE_UNSPECIFIED = 0;
+  HVAC_MODE_HEATING     = 1;
+  HVAC_MODE_COOLING     = 2;
+  HVAC_MODE_DEHUMIDIFY  = 3;
+  HVAC_MODE_FAN_ONLY    = 4;
+  HVAC_MODE_AUTO        = 5;
+}
+enum AcFanSpeed {
+  FAN_SPEED_UNSPECIFIED = 0;
+  FAN_SPEED_AUTO        = 1;
+  FAN_SPEED_LOW         = 2;
+  FAN_SPEED_MEDIUM      = 3;
+  FAN_SPEED_HIGH        = 4;
+}
+
+// ---- SubscribeEvents (server-streaming live state) ----
+message SubscribeRequest { repeated DeviceRef devices = 1; }
+message DeviceRef { bytes mac_address = 1; uint32 node_id = 2; }
+message Event { bytes mac_address = 1; uint32 node_id = 2; DeviceState state = 3; }
+
+service AppService {
+  rpc SendDevice (DeviceRequest) returns (DeviceResponse);
+  rpc SubscribeEvents (SubscribeRequest) returns (stream Event);
+}
