@@ -129,7 +129,7 @@ def _one(d: dict, fn: int):
 
 
 def mac_to_bytes(mac: str) -> bytes:
-    """'E4:B3:23:8E:64:84' -> 6 raw bytes."""
+    """'AA:BB:CC:DD:EE:FF' -> 6 raw bytes."""
     return bytes.fromhex(mac.replace(":", "").replace("-", ""))
 
 

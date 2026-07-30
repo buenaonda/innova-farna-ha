@@ -12,7 +12,7 @@ package services.app;
 
 // ---- Request wrapper (app class pw4) ----
 message DeviceRequest {
-  bytes  mac_address = 1;   // 6 raw bytes, e.g. E4 B3 23 8E 64 84  (NOT the ascii string)
+  bytes  mac_address = 1;   // 6 raw bytes, e.g. AA BB CC DD EE FF  (NOT the ascii string)
   uint32 node_id     = 2;
   Command request    = 3;
 }

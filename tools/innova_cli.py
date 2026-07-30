@@ -7,8 +7,8 @@ confirm the hvac_mode / fan_speed enum values.
     pip install grpcio protobuf
     python tools/innova_cli.py login   --email you@x.com --password ***
     python tools/innova_cli.py homes   --token <JWT>
-    python tools/innova_cli.py get     --token <JWT> --mac E4:B3:23:8E:64:84 --node 0
-    python tools/innova_cli.py set      --token <JWT> --mac E4:B3:23:8E:64:84 --power on --temp 22 --mode 2 --fan 1
+    python tools/innova_cli.py get     --token <JWT> --mac AA:BB:CC:DD:EE:FF --node 0
+    python tools/innova_cli.py set      --token <JWT> --mac AA:BB:CC:DD:EE:FF --power on --temp 22 --mode 2 --fan 1
     # passwordless (Google accounts): request a code, then log in with it
     python tools/innova_cli.py send-code --email you@x.com
     python tools/innova_cli.py code      --email you@x.com --code 123456
