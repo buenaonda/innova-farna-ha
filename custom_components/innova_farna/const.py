@@ -27,11 +27,11 @@ TARGET_TEMP_STEP = 0.5
 # options [1,2,3,4,5]. The numeric->meaning mapping below is BEST-EFFORT
 # (typical Innova order) and should be verified against the app; adjust here.
 HVAC_MODE_TO_HA: dict[int, HVACMode] = {
-    1: HVACMode.HEAT,
-    2: HVACMode.COOL,
-    3: HVACMode.DRY,
-    4: HVACMode.FAN_ONLY,
-    5: HVACMode.AUTO,
+    1: HVACMode.AUTO,       # confirmed live
+    2: HVACMode.HEAT,       # confirmed live
+    3: HVACMode.COOL,       # confirmed live
+    4: HVACMode.DRY,        # confirmed live
+    5: HVACMode.FAN_ONLY,   # confirmed live
 }
 HA_TO_HVAC_MODE: dict[HVACMode, int] = {v: k for k, v in HVAC_MODE_TO_HA.items()}
 
