@@ -13,8 +13,10 @@ CONF_PASSWORD = "password"
 CONF_TOKEN = "token"
 
 # Polling interval. The unit only answers while connected to the Innova cloud;
-# the coordinator tolerates "device offline" between polls.
-SCAN_INTERVAL = timedelta(seconds=60)
+# the coordinator tolerates "device offline" between polls. Kept short so changes
+# made in the Innova app show up in HA quickly (a real-time SubscribeEvents push
+# path is planned to make this instant).
+SCAN_INTERVAL = timedelta(seconds=15)
 
 MANUFACTURER = "Innova"
 
