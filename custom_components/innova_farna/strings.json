@@ -8,20 +8,28 @@
           "email": "Email",
           "password": "Password"
         }
+      },
+      "reauth_confirm": {
+        "title": "Innova FÄRNA",
+        "description": "Re-enter the password for {email}.",
+        "data": {
+          "password": "Password"
+        }
       }
     },
     "error": {
       "invalid_auth": "Invalid email or password.",
-      "cannot_connect": "Could not reach the Innova cloud."
+      "cannot_connect": "Could not reach the Innova cloud.",
+      "unknown": "Unexpected error."
     },
     "abort": {
-      "already_configured": "This Innova account is already configured."
+      "already_configured": "This Innova account is already configured.",
+      "reauth_successful": "Re-authentication was successful."
     }
   },
   "entity": {
     "sensor": {
-      "air_temperature": { "name": "Ambient temperature" },
-      "air_humidity": { "name": "Ambient humidity" }
+      "air_temperature": { "name": "Ambient temperature" }
     }
   }
 }

@@ -15,7 +15,7 @@ that protocol, so it works where the local integration returns *"cannot connect"
 ## Features
 
 - `climate` entity: power, target temperature, HVAC mode, fan speed
-- `sensor` entities: ambient temperature and humidity reported by the unit
+- `sensor` entity: ambient temperature reported by the unit
 - Pure cloud, no extra hardware, no need to open/modify the unit
 
 ## Requirements
@@ -44,10 +44,7 @@ The full reverse-engineered protocol is documented in
 
 ## Status
 
-**v0.2 — working.** Live-validated end-to-end on a real FÄRNA unit: reads state (ambient temp, setpoint, mode, fan) via cloud polling and controls power/temperature/mode/fan. Protocol validated end-to-end (auth + gRPC transport +
-message framing). The `hvac_mode` / `fan_speed` enum **numeric values** are best-effort and
-being confirmed against live devices — if a mode/fan looks wrong, please open an issue with
-the raw `GetState` output.
+**v0.4 — working.** Live-validated end-to-end on a real FÄRNA unit: reads ambient temperature, setpoint, mode and fan via cloud polling, and controls power/temperature/mode/fan. HVAC-mode and fan-speed mappings are confirmed against the app. No generated protobuf code is shipped — messages are encoded/decoded directly, so the only dependency is `grpcio`.
 
 ## Credits
 

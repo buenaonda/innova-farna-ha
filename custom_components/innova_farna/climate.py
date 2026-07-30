@@ -1,6 +1,7 @@
 """Climate platform for Innova FÄRNA."""
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
 
 from homeassistant.components.climate import (
@@ -11,8 +12,10 @@ from homeassistant.components.climate import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .api import InnovaError
 from .const import (
     DOMAIN,
     FAN_TO_HA,
@@ -84,52 +87,50 @@ class InnovaClimate(InnovaEntity, ClimateEntity):
             return None
         if not st.power:
             return HVACMode.OFF
-        return HVAC_MODE_TO_HA.get(st.hvac_mode, HVACMode.AUTO)
+        return HVAC_MODE_TO_HA.get(st.hvac_mode)
 
     @property
     def fan_mode(self) -> str | None:
         st = self._state
         return FAN_TO_HA.get(st.fan_speed) if st else None
 
+    async def _command(self, optimistic: dict[str, Any], **kwargs: Any) -> None:
+        """Send a set_state, optimistically update local state, then refresh."""
+        try:
+            await self.coordinator.client.set_state(
+                self._device.mac_address, self._device.node_id, **kwargs
+            )
+        except InnovaError as err:
+            raise HomeAssistantError(f"Innova command failed: {err}") from err
+        st = self._state
+        if st is not None and optimistic:
+            self.coordinator.data[self._key] = dataclasses.replace(st, **optimistic)
+            self.async_write_ha_state()
+        await self.coordinator.async_request_refresh()
+
     async def async_set_temperature(self, **kwargs: Any) -> None:
         temp = kwargs.get(ATTR_TEMPERATURE)
         if temp is None:
             return
-        await self.coordinator.client.set_state(
-            self._device.mac_address, self._device.node_id, temperature_setpoint=temp
-        )
-        await self.coordinator.async_request_refresh()
+        await self._command({"target_temperature": temp}, temperature_setpoint=temp)
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         if hvac_mode == HVACMode.OFF:
-            await self.coordinator.client.set_state(
-                self._device.mac_address, self._device.node_id, power=False
-            )
+            await self._command({"power": False}, power=False)
         else:
-            await self.coordinator.client.set_state(
-                self._device.mac_address,
-                self._device.node_id,
+            await self._command(
+                {"power": True, "hvac_mode": HA_TO_HVAC_MODE.get(hvac_mode)},
                 power=True,
                 hvac_mode=HA_TO_HVAC_MODE.get(hvac_mode),
             )
-        await self.coordinator.async_request_refresh()
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
-        await self.coordinator.client.set_state(
-            self._device.mac_address,
-            self._device.node_id,
-            fan_speed=HA_TO_FAN.get(fan_mode),
+        await self._command(
+            {"fan_speed": HA_TO_FAN.get(fan_mode)}, fan_speed=HA_TO_FAN.get(fan_mode)
         )
-        await self.coordinator.async_request_refresh()
 
     async def async_turn_on(self) -> None:
-        await self.coordinator.client.set_state(
-            self._device.mac_address, self._device.node_id, power=True
-        )
-        await self.coordinator.async_request_refresh()
+        await self._command({"power": True}, power=True)
 
     async def async_turn_off(self) -> None:
-        await self.coordinator.client.set_state(
-            self._device.mac_address, self._device.node_id, power=False
-        )
-        await self.coordinator.async_request_refresh()
+        await self._command({"power": False}, power=False)

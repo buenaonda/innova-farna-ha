@@ -1,10 +1,11 @@
 """Shared base entity for Innova FÄRNA."""
 from __future__ import annotations
 
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .api import Device
+from .api import AcState, Device
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import InnovaCoordinator
 
@@ -20,6 +21,7 @@ class InnovaEntity(CoordinatorEntity[InnovaCoordinator]):
         self._key = (device.mac_address, device.node_id)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{device.mac_address}_{device.node_id}")},
+            connections={(dr.CONNECTION_NETWORK_MAC, device.mac_address)},
             manufacturer=MANUFACTURER,
             name=device.name or "Innova",
             model="FÄRNA",
@@ -28,8 +30,8 @@ class InnovaEntity(CoordinatorEntity[InnovaCoordinator]):
         )
 
     @property
-    def _state(self):
-        """Current AcState protobuf message, or None if the device is offline."""
+    def _state(self) -> AcState | None:
+        """Current AcState, or None if the device is offline."""
         return (self.coordinator.data or {}).get(self._key)
 
     @property
