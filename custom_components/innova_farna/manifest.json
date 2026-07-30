@@ -1,11 +1,16 @@
 {
   "domain": "innova_farna",
   "name": "Innova FÄRNA",
-  "codeowners": ["@buenaonda"],
+  "codeowners": [
+    "@buenaonda"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/buenaonda/innova-farna-ha",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/buenaonda/innova-farna-ha/issues",
-  "requirements": ["grpcio>=1.60", "protobuf>=4.25"],
-  "version": "0.1.0"
+  "requirements": [
+    "grpcio>=1.60",
+    "protobuf>=4.25"
+  ],
+  "version": "0.2.0"
 }

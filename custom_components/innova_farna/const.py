@@ -23,8 +23,9 @@ MAX_TEMP = 31.0
 TARGET_TEMP_STEP = 0.5
 
 # --- Enum mappings ---------------------------------------------------------
-# NOTE: the numeric protobuf enum values below are BEST-EFFORT and must be
-# confirmed against a live device (GetState). Adjust here once verified.
+# Confirmed live: the AC reports hvac_mode options [1,2,3,4,5] and fan_speed
+# options [1,2,3,4,5]. The numeric->meaning mapping below is BEST-EFFORT
+# (typical Innova order) and should be verified against the app; adjust here.
 HVAC_MODE_TO_HA: dict[int, HVACMode] = {
     1: HVACMode.HEAT,
     2: HVACMode.COOL,
@@ -34,10 +35,12 @@ HVAC_MODE_TO_HA: dict[int, HVACMode] = {
 }
 HA_TO_HVAC_MODE: dict[HVACMode, int] = {v: k for k, v in HVAC_MODE_TO_HA.items()}
 
+FAN_MAX = "max"
 FAN_TO_HA: dict[int, str] = {
     1: FAN_AUTO,
     2: FAN_LOW,
     3: FAN_MEDIUM,
     4: FAN_HIGH,
+    5: FAN_MAX,
 }
 HA_TO_FAN: dict[str, int] = {v: k for k, v in FAN_TO_HA.items()}

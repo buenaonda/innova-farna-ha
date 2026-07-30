@@ -37,11 +37,8 @@ async def async_setup_entry(
 class InnovaClimate(InnovaEntity, ClimateEntity):
     """An Innova FÄRNA air conditioner as a climate entity."""
 
-    _attr_name = None  # use the device name
+    _attr_name = None
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
-    _attr_target_temperature_step = TARGET_TEMP_STEP
-    _attr_min_temp = MIN_TEMP
-    _attr_max_temp = MAX_TEMP
     _attr_hvac_modes = [HVACMode.OFF, *HVAC_MODE_TO_HA.values()]
     _attr_fan_modes = list(FAN_TO_HA.values())
     _attr_supported_features = (
@@ -56,19 +53,29 @@ class InnovaClimate(InnovaEntity, ClimateEntity):
         self._attr_unique_id = f"{device.mac_address}_{device.node_id}_climate"
 
     @property
-    def current_temperature(self) -> float | None:
+    def min_temp(self) -> float:
         st = self._state
-        return round(st.air_temperature, 1) if st else None
+        return st.min_temp if st and st.min_temp else MIN_TEMP
 
     @property
-    def current_humidity(self) -> int | None:
+    def max_temp(self) -> float:
         st = self._state
-        return int(st.air_humidity) if st and st.air_humidity else None
+        return st.max_temp if st and st.max_temp else MAX_TEMP
+
+    @property
+    def target_temperature_step(self) -> float:
+        st = self._state
+        return st.temp_step if st and st.temp_step else TARGET_TEMP_STEP
+
+    @property
+    def current_temperature(self) -> float | None:
+        st = self._state
+        return st.current_temperature if st else None
 
     @property
     def target_temperature(self) -> float | None:
         st = self._state
-        return st.temperature_setpoint if st else None
+        return st.target_temperature if st else None
 
     @property
     def hvac_mode(self) -> HVACMode | None:

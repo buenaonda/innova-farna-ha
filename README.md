@@ -44,7 +44,7 @@ The full reverse-engineered protocol is documented in
 
 ## Status
 
-**v0.1 — early / experimental.** Protocol validated end-to-end (auth + gRPC transport +
+**v0.2 — working.** Live-validated end-to-end on a real FÄRNA unit: reads state (ambient temp, setpoint, mode, fan) via cloud polling and controls power/temperature/mode/fan. Protocol validated end-to-end (auth + gRPC transport +
 message framing). The `hvac_mode` / `fan_speed` enum **numeric values** are best-effort and
 being confirmed against live devices — if a mode/fan looks wrong, please open an issue with
 the raw `GetState` output.

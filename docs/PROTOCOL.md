@@ -16,7 +16,7 @@ danielrivard/homeassistant-innova#278.
   `POST users/reset-password` body `{"email","verificationCode"}` → `{"token","user"}` (returns a token directly).
 - All other REST calls AND gRPC calls send header/metadata: `Authorization: Bearer <token>`.
 
-## REST API surface (interface defpackage/c.java; annotations de-obfuscated: zu3=POST s42=GET yu3=PUT f51=DELETE av3=PATCH ux3=@Path xa2=@Header w40=@Body)
+## REST API surface (interface defpackage/c.java; annotations de-obfuscated: zu3=POST s42=GET yu3=PATCH f51=DELETE av3=PATCH ux3=@Path xa2=@Header w40=@Body)
 - `GET  homes` → list of homes → rooms → devices (identity/config only, NO thermostat state)
 - `POST users` (register), `PUT users/me`, `DELETE users/me`, `PUT users/change-password`, `POST users/verify-email`, `POST users/login-google`
 - `POST devices` (add), `POST devices/{mac}` (register nodes; body {nodes:[{deviceUid,id,name,roomId}]}), `PUT devices/{mac}/{nodeId}` (update device config), `DELETE devices/{mac}/{nodeId}`
