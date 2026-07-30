@@ -48,7 +48,7 @@ The full reverse-engineered protocol is documented in
 
 ## Credits
 
-Reverse-engineered and built by [@buenaonda](https://github.com/buenaonda) with Claude Code.
+Reverse-engineered and built by [@buenaonda](https://github.com/buenaonda).
 Not affiliated with or endorsed by Innova / Solution Tech. Use at your own risk.
 
 ## License
