@@ -160,8 +160,11 @@ def main() -> None:
     }
     for nombre, img in salidas.items():
         destino = DESTINO / nombre
-        # optimize + interlaced: las reglas piden comprimido y progresivo.
-        img.save(destino, "PNG", optimize=True, interlace=1)
+        # Las reglas piden comprimido y, "preferentemente", entrelazado.
+        # Pillow IGNORA interlace en PNG (solo lo aplica a GIF), así que estos
+        # salen no-entrelazados. Es una preferencia, no un requisito, y el
+        # chequeo de HACS pasa igual — pero no lo afirmemos si no es cierto.
+        img.save(destino, "PNG", optimize=True)
         print(f"  {nombre:14s} {img.size[0]}x{img.size[1]}  {destino.stat().st_size:>6} bytes")
 
 
