@@ -13,6 +13,15 @@ DOMAIN = "innova_farna"
 # push path is planned to make app-side changes instant.)
 SCAN_INTERVAL = timedelta(seconds=15)
 
+# Cada cuánto se vuelve a preguntar a la nube QUÉ EQUIPOS tiene la cuenta.
+#
+# Deliberadamente MUY superior a SCAN_INTERVAL: el estado de un aire cambia a
+# cada rato, pero la lista de equipos de una cuenta cambia cuando alguien compra
+# uno — cosa de meses. Re-enumerar en cada ciclo de 15 s serían 4 llamadas extra
+# por minuto contra un servicio de terceros del que no conocemos el rate limit,
+# a cambio de nada.
+DEVICE_REFRESH_INTERVAL = timedelta(minutes=10)
+
 MANUFACTURER = "Innova"
 
 MIN_TEMP = 16.0

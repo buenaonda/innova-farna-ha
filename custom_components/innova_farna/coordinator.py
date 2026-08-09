@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
@@ -18,7 +19,7 @@ from .api import (
     InnovaDeviceOffline,
     InnovaError,
 )
-from .const import DOMAIN, SCAN_INTERVAL
+from .const import DEVICE_REFRESH_INTERVAL, DOMAIN, SCAN_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +39,7 @@ class InnovaCoordinator(DataUpdateCoordinator[StateMap]):
         )
         self.client = InnovaClient(session=async_get_clientsession(hass))
         self.devices: list[Device] = []
+        self._devices_refreshed_at: datetime | None = None
 
     async def _async_login(self) -> None:
         await self.client.login(
@@ -47,7 +49,7 @@ class InnovaCoordinator(DataUpdateCoordinator[StateMap]):
     async def _async_setup(self) -> None:
         try:
             await self._async_login()
-            self.devices = await self.client.list_devices()
+            await self._refresh_devices()
         except InnovaAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except InnovaError as err:
@@ -55,9 +57,42 @@ class InnovaCoordinator(DataUpdateCoordinator[StateMap]):
         if not self.devices:
             _LOGGER.warning("Innova account has no devices")
 
+    async def _refresh_devices(self) -> list[Device]:
+        """Re-lee la lista de equipos de la cuenta y devuelve los NUEVOS.
+
+        Antes esto se hacía una sola vez, al montar la integración, y solo se
+        repetía si la lista había quedado vacía. Consecuencia: un aire agregado
+        a la cuenta DESPUÉS del setup no aparecía nunca — no es que tardara, es
+        que nadie volvía a preguntar. Había que recargar la integración a mano.
+        """
+        conocidos = {(d.mac_address, d.node_id) for d in self.devices}
+        self.devices = await self.client.list_devices()
+        self._devices_refreshed_at = datetime.now(timezone.utc)
+        nuevos = [d for d in self.devices if (d.mac_address, d.node_id) not in conocidos]
+        if nuevos and conocidos:
+            # `and conocidos` evita anunciar como "nuevos" los del primer arranque.
+            _LOGGER.info(
+                "Innova: %d equipo(s) nuevo(s) en la cuenta: %s",
+                len(nuevos),
+                ", ".join(d.name or d.serial_number for d in nuevos),
+            )
+        return nuevos
+
+    def _toca_redescubrir(self) -> bool:
+        if not self.devices or self._devices_refreshed_at is None:
+            return True
+        return datetime.now(timezone.utc) - self._devices_refreshed_at >= DEVICE_REFRESH_INTERVAL
+
     async def _fetch_states(self) -> StateMap:
-        if not self.devices:
-            self.devices = await self.client.list_devices()
+        if self._toca_redescubrir():
+            try:
+                await self._refresh_devices()
+            except InnovaAuthError:
+                raise  # la maneja _async_update_data con un re-login
+            except InnovaError as err:
+                # Que falle el redescubrimiento NO puede dejar sin estado a los
+                # equipos que ya funcionan: se sigue con la lista conocida.
+                _LOGGER.warning("Innova: no se pudo refrescar la lista de equipos: %s", err)
         states: StateMap = {}
         for dev in self.devices:
             key = (dev.mac_address, dev.node_id)

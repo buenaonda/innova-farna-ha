@@ -18,6 +18,21 @@ that protocol, so it works where the local integration returns *"cannot connect"
 - `sensor` entity: ambient temperature reported by the unit
 - Pure cloud, no extra hardware, no need to open/modify the unit
 
+## Equipos nuevos
+
+Si agregas un aire acondicionado a tu cuenta Innova, **aparece solo** en Home
+Assistant: la integración vuelve a consultar la lista de equipos de la cuenta
+cada 10 minutos y crea las entidades de los que encuentre, sin reiniciar ni
+recargar nada.
+
+Hasta la v0.4.0 no era así — la lista se leía una única vez al configurar la
+integración, y un equipo agregado después no aparecía nunca hasta recargarla a
+mano.
+
+El estado de cada equipo se sigue consultando cada 15 segundos; solo el
+*descubrimiento* usa el intervalo largo, porque la lista de equipos de una
+cuenta cambia cuando alguien compra uno, no a cada rato.
+
 ## Requirements
 
 - A working **Innova app account** (email + password). If you signed up with Google,
