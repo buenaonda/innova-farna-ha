@@ -128,3 +128,23 @@ class TestFallaDeRedescubrimiento:
 
         assert ("aa", 0) in estados
         assert len(coord.devices) == 1
+
+
+async def test_una_lista_vacia_no_borra_los_equipos_vivos():
+    """La nube puede responder 200 con `[]` en una falla transitoria.
+
+    El `except InnovaError` solo cubre cuando la llamada LANZA. Con una lista
+    vacía aceptada, `_fetch_states` devolvía un mapa vacío y TODAS las entidades
+    caían, mientras el coordinador reportaba éxito: un fallo que no se ve como
+    fallo. Hallazgo de la revisión de Grok (2026-08-24).
+    """
+    coord = InnovaCoordinator.__new__(InnovaCoordinator)
+    coord.devices = [_dev("aa:bb:cc:dd:ee:01"), _dev("aa:bb:cc:dd:ee:02")]
+    coord._devices_refreshed_at = None
+    coord.client = AsyncMock()
+    coord.client.list_devices = AsyncMock(return_value=[])
+
+    nuevos = await coord._refresh_devices()
+
+    assert nuevos == []
+    assert len(coord.devices) == 2, "los equipos conocidos deben sobrevivir"

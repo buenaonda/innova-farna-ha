@@ -66,8 +66,23 @@ class InnovaCoordinator(DataUpdateCoordinator[StateMap]):
         que nadie volvía a preguntar. Había que recargar la integración a mano.
         """
         conocidos = {(d.mac_address, d.node_id) for d in self.devices}
-        self.devices = await self.client.list_devices()
+        listado = await self.client.list_devices()
         self._devices_refreshed_at = datetime.now(timezone.utc)
+
+        # Una lista VACÍA no se acepta si ya había equipos. El `except InnovaError`
+        # de arriba solo protege cuando la llamada LANZA; si la nube responde 200
+        # con `[]` —cosa que pasa en fallas transitorias del backend— esta línea
+        # borraba los equipos vivos, `_fetch_states` devolvía un mapa vacío y las
+        # entidades caían todas... mientras el coordinador reportaba ÉXITO.
+        # Hallazgo de la revisión de Grok (2026-08-24).
+        if not listado and self.devices:
+            _LOGGER.warning(
+                "Innova: la cuenta devolvió 0 equipos; conservo los %d conocidos",
+                len(self.devices),
+            )
+            return []
+
+        self.devices = listado
         nuevos = [d for d in self.devices if (d.mac_address, d.node_id) not in conocidos]
         if nuevos and conocidos:
             # `and conocidos` evita anunciar como "nuevos" los del primer arranque.
