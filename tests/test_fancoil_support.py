@@ -230,3 +230,46 @@ def test_hvac_mode_de_lectura_usa_la_tabla_de_la_familia():
         f"el modo {crudo} existe en AC pero no en FARNA: un fan-coil que lo "
         "reporte no debe mostrar el modo del aire"
     )
+
+
+# ---------- 9. fallar visible en vez de mentir plausible ----------
+#
+# Hallazgos de la revisión de Grok (2026-08-24). Los tres comparten una causa:
+# el parser prefería devolver un estado creíble antes que fallar. Un equipo que
+# aparece "apagado y sin temperatura" es peor que uno "no disponible", porque
+# nadie va a mirar dos veces un termostato que dice estar apagado.
+
+def test_bloque_de_estado_presente_pero_vacio_no_pasa_por_apagado():
+    """`b""` pasaba el `is not None` y salía AcState(power=False, temps=None).
+
+    Este es el caso que el primer arreglo NO cubría: distinguía el campo AUSENTE
+    del presente, pero no el presente-y-vacío.
+    """
+    s = _ld(1, b"")
+    resp = _ld(2, _ld(1, _ld(1, _ld(1, b"") + _ld(2, _ld(2, s)))))
+    with pytest.raises(Exception):
+        _parse_state(resp)
+
+
+def test_un_fancoil_gana_si_el_campo_del_aire_viene_vacio():
+    """Campo 1 vacío no debe ganarle a un campo 2 con contenido real."""
+    s = _ld(1, b"") + _ld(2, _bloque_estado(target=21.5))
+    resp = _ld(2, _ld(1, _ld(1, _ld(1, b"") + _ld(2, _ld(2, s)))))
+    st = _parse_state(resp)
+    assert st.family == "fancoil"
+    assert st.target_temperature == 21.5
+
+
+def test_payload_truncado_no_se_lee_como_mensaje_vacio():
+    """El slice de Python recorta en silencio; acá tiene que doler."""
+    completo = _respuesta(_bloque_estado(), campo=1)
+    with pytest.raises(Exception):
+        _parse_state(completo[:-12])
+
+
+def test_wire_type_desconocido_no_devuelve_estado_parcial():
+    """Antes hacía `break` y entregaba lo decodificado hasta ese punto."""
+    basura = _tag(9, 3) + b"\x01\x02"          # wire type 3 (grupo), no soportado
+    resp = _respuesta(_bloque_estado() + basura, campo=1)
+    with pytest.raises(Exception):
+        _parse_state(resp)

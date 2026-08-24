@@ -115,10 +115,19 @@ def _fields(data: bytes) -> dict[int, list]:
                 shift += 7
                 if not b & 0x80:
                     break
+            # Un payload truncado NO se puede leer como mensaje vacío: el slice
+            # de Python recorta en silencio y el estado sale "apagado y sin
+            # temperatura" en vez de fallar. Preferimos la excepción, que
+            # get_state traduce a InnovaDeviceOffline.
+            if i + ln > n:
+                raise ValueError(f"truncated length-delimited field {fn}: need {ln}, have {n - i}")
             v = data[i : i + ln]
             i += ln
         else:
-            break
+            # Wire type desconocido (grupos 3/4 o basura). Antes se hacía `break`
+            # y se devolvía lo decodificado hasta ahí: un estado PARCIAL que se
+            # ve válido. Mejor romper fuerte.
+            raise ValueError(f"unsupported wire type {wt} on field {fn}")
         out.setdefault(fn, []).append(v)
     return out
 
@@ -216,13 +225,17 @@ def _parse_state(resp: bytes) -> AcState:
     # InnovaDeviceOffline. Sin esto, una respuesta con forma desconocida caía en
     # la rama fan-coil con el bloque vacío y el equipo aparecía en HA "apagado y
     # sin temperatura" — un estado plausible y falso, peor que un error visible.
-    state_block = _one(s, 1)
-    if state_block is not None:
+    # Se exige contenido, no mera presencia: un submensaje VACÍO (b"") pasa el
+    # `is not None` y produce AcState(power=False, temps=None) — el equipo se ve
+    # apagado y sin temperatura, que es justo la mentira plausible que queremos
+    # evitar. Hallazgo de la revisión de Grok, verificado con un caso real.
+    state_block = _one(s, 1) or None
+    if state_block:
         family = "ac"
     else:
-        state_block = _one(s, 2)
-        if state_block is None:
-            raise ValueError("state block missing on both field 1 (ac) and 2 (fancoil)")
+        state_block = _one(s, 2) or None
+        if not state_block:
+            raise ValueError("no usable state block on field 1 (ac) nor 2 (fancoil)")
         family = "fancoil"
 
     ac = _fields(state_block)
