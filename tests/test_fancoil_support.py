@@ -180,3 +180,53 @@ def test_respuesta_desconocida_no_se_hace_pasar_por_fancoil():
     """
     with pytest.raises(Exception):
         _parse_state(_respuesta(None, campo=1))
+
+
+# ---------- 7. el sensor de Wi-Fi no puede tumbar el termostato ----------
+#
+# Hallazgo de la revisión de Fable (2026-08-24): el parseo de RSSI recorre `d.f1`,
+# un campo que el código anterior al PR nunca tocaba y cuya forma en un AIRE no
+# está observada en vivo. Si llega con un wire type inesperado, `_fields(int)`
+# revienta y el equipo queda "no disponible" en HA de forma permanente.
+
+def _respuesta_metadata_rara(metadata_raw: bytes) -> bytes:
+    """get_state válido para el clima, pero con metadata de forma inesperada."""
+    estado = _ld(2, _ld(2, _ld(1, _bloque_estado(target=23.0))))
+    return _ld(2, _ld(1, _ld(1, metadata_raw + estado)))
+
+
+def test_metadata_como_varint_no_rompe_el_estado_climatico():
+    """`d.f1` como entero en vez de submensaje: antes reventaba todo el parseo."""
+    st = _parse_state(_respuesta_metadata_rara(_vint(1, 12345)))
+    assert st.target_temperature == 23.0, "el clima debe parsearse igual"
+    assert st.wifi_rssi is None, "el RSSI se rinde, no arrastra al resto"
+    assert st.family == "ac"
+
+
+def test_metadata_truncada_no_rompe_el_estado_climatico():
+    st = _parse_state(_respuesta_metadata_rara(_ld(1, b"\xff\xff\xff")))
+    assert st.target_temperature == 23.0
+    assert st.wifi_rssi is None
+
+
+# ---------- 8. hvac_mode de lectura discrimina por familia ----------
+#
+# `hvac_modes`, `fan_mode` y las escrituras ya miraban la familia; la propiedad de
+# LECTURA `hvac_mode` no. Hoy los enteros coinciden, pero un fan-coil que reporte
+# un modo fuera de su tabla mostraría un modo que su propia lista no ofrece.
+
+def test_hvac_mode_de_lectura_usa_la_tabla_de_la_familia():
+    from custom_components.innova_farna.const import (
+        FARNA_HVAC_MODE_TO_HA,
+        HVAC_MODE_TO_HA,
+    )
+
+    solo_ac = set(HVAC_MODE_TO_HA) - set(FARNA_HVAC_MODE_TO_HA)
+    if not solo_ac:
+        pytest.skip("las tablas coinciden: no hay valor que distinga las familias")
+
+    crudo = next(iter(solo_ac))
+    assert FARNA_HVAC_MODE_TO_HA.get(crudo) is None, (
+        f"el modo {crudo} existe en AC pero no en FARNA: un fan-coil que lo "
+        "reporte no debe mostrar el modo del aire"
+    )

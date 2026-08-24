@@ -131,7 +131,12 @@ class InnovaClimate(InnovaEntity, ClimateEntity):
             return None
         if not st.power:
             return HVACMode.OFF
-        return HVAC_MODE_TO_HA.get(st.hvac_mode)
+        # Discrimina por familia igual que `hvac_modes` y las escrituras. Hoy los
+        # enteros coinciden (1/2/3 = AUTO/HEAT/COOL en ambas), pero si un fan-coil
+        # reportara 4 o 5 esto mostraría DRY/FAN_ONLY — modos que su propia lista
+        # `hvac_modes` no ofrece, o sea un estado imposible en la interfaz.
+        tabla = FARNA_HVAC_MODE_TO_HA if st.family == "fancoil" else HVAC_MODE_TO_HA
+        return tabla.get(st.hvac_mode)
 
     @property
     def fan_mode(self) -> str | None:

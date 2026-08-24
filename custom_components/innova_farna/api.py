@@ -183,15 +183,28 @@ def _parse_state(resp: bytes) -> AcState:
     d = _fields(_one(d, 1))
 
     # Device metadata: field 2 appears to be Wi-Fi RSSI encoded as int64.
-    metadata = _fields(_one(d, 1) or b"")
+    #
+    # AISLADO A PROPÓSITO. Esta rama recorre `d.f1`, un campo que el código
+    # anterior NUNCA tocaba y cuya forma en un AIRE no está observada en vivo —
+    # se dedujo de un fan-coil. Si en un aire llega como varint en vez de
+    # submensaje, `_fields(int)` levanta TypeError, `get_state` lo traduce a
+    # InnovaDeviceOffline y el equipo queda PERMANENTEMENTE "no disponible" en
+    # Home Assistant. Un sensor diagnóstico de Wi-Fi no puede tener el poder de
+    # tumbar el termostato: ante cualquier sorpresa acá, RSSI queda en None y el
+    # estado climático se parsea igual.
+    wifi_rssi = None
+    try:
+        metadata = _fields(_one(d, 1) or b"")
 
-    wifi = _fields(_one(metadata, 4) or b"")
-    wifi = _fields(_one(wifi, 2) or b"")
-    wifi = _fields(_one(wifi, 1) or b"")
+        wifi = _fields(_one(metadata, 4) or b"")
+        wifi = _fields(_one(wifi, 2) or b"")
+        wifi = _fields(_one(wifi, 1) or b"")
 
-    wifi_rssi = _one(wifi, 2)
-    if wifi_rssi is not None and wifi_rssi >= (1 << 63):
-        wifi_rssi -= 1 << 64
+        wifi_rssi = _one(wifi, 2)
+        if wifi_rssi is not None and wifi_rssi >= (1 << 63):
+            wifi_rssi -= 1 << 64
+    except Exception:  # noqa: BLE001 — metadata es opcional; el clima no.
+        wifi_rssi = None
 
     s = _fields(_one(d, 2))
     s = _fields(_one(s, 2))
