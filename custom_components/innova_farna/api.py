@@ -10,8 +10,8 @@ own constraints. The only third-party dependency is ``grpcio`` (the transport).
 
 State read: ``SendDevice{shared.get_state}`` returns a deeply-nested, UI-oriented
 message; we navigate it by the observed field-number path (validated live).
-Commands: ``SendDevice{ac.set_state{...}}`` (validated live — a setpoint change
-echoes back over SubscribeEvents).
+Commands use the device-family-specific ``set_state`` branch (AC or fan-coil),
+selected automatically from the state response.
 """
 from __future__ import annotations
 
@@ -145,7 +145,7 @@ class Device:
 
 @dataclass
 class AcState:
-    """Decoded air-conditioner state (raw enum ints; see const for HA mapping)."""
+    """Decoded climate state (raw enum ints; see const for HA mapping)."""
     power: bool
     current_temperature: float | None
     target_temperature: float | None
@@ -154,6 +154,8 @@ class AcState:
     temp_step: float | None
     hvac_mode: int | None
     fan_speed: int | None
+    wifi_rssi: int | None = None
+    family: str = "ac"
 
 
 def _build_get_state(mac: str, node_id: int) -> bytes:
@@ -165,24 +167,46 @@ def _build_get_state(mac: str, node_id: int) -> bytes:
     return req + _ld(3, command)
 
 
-def _build_set_state(mac: str, node_id: int, ss: bytes) -> bytes:
-    # DeviceRequest{ mac(1), node(2?), request(3)=Command{ac(3)=Ac{set_state(1)=SetState}} }
-    command = _ld(3, _ld(1, ss))
+def _build_set_state(mac: str, node_id: int, ss: bytes, family: str = "ac") -> bytes:
+    # Command oneof: field 3 = AC, field 5 = fan-coil/FARNA.
+    command_field = 5 if family == "fancoil" else 3
+    command = _ld(command_field, _ld(1, ss))
     req = _ld(1, mac_to_bytes(mac))
     if node_id:
         req += _vint(2, node_id)
     return req + _ld(3, command)
 
+def _parse_state(resp: bytes) -> AcState:
+    """Decode get_state response for supported AC and fan-coil devices."""
+    d = _fields(_one(_fields(resp), 2))
+    d = _fields(_one(d, 1))
+    d = _fields(_one(d, 1))
 
-def _parse_ac_state(resp: bytes) -> AcState:
-    """Navigate the get_state response: resp.f2.f1.f1.f2.f2.f1 = the AC block."""
-    d = _fields(_one(_fields(resp), 2))   # device
-    d = _fields(_one(d, 1))
-    d = _fields(_one(d, 1))
-    s = _fields(_one(d, 2))               # state
+    # Device metadata: field 2 appears to be Wi-Fi RSSI encoded as int64.
+    metadata = _fields(_one(d, 1) or b"")
+
+    wifi = _fields(_one(metadata, 4) or b"")
+    wifi = _fields(_one(wifi, 2) or b"")
+    wifi = _fields(_one(wifi, 1) or b"")
+
+    wifi_rssi = _one(wifi, 2)
+    if wifi_rssi is not None and wifi_rssi >= (1 << 63):
+        wifi_rssi -= 1 << 64
+
+    s = _fields(_one(d, 2))
     s = _fields(_one(s, 2))
-    ac = _fields(_one(s, 1))              # AC block
-    tb = _fields(_one(ac, 3) or b"")      # {setpoint, min, max, step}
+
+    # AC units use field 1, FARNA/fan-coil units use field 2.
+    state_block = _one(s, 1)
+    if state_block is not None:
+        family = "ac"
+    else:
+        state_block = _one(s, 2)
+        family = "fancoil"
+
+    ac = _fields(state_block or b"")
+
+    tb = _fields(_one(ac, 3) or b"")
     mode = _fields(_one(ac, 4) or b"")
     fan = _fields(_one(ac, 5) or b"")
 
@@ -198,8 +222,9 @@ def _parse_ac_state(resp: bytes) -> AcState:
         temp_step=r(_one(tb, 4), 2),
         hvac_mode=_one(mode, 1),
         fan_speed=_one(fan, 1),
+        wifi_rssi=wifi_rssi,
+        family=family,
     )
-
 
 class InnovaClient:
     """REST for auth/inventory, raw gRPC for state/commands."""
@@ -209,6 +234,7 @@ class InnovaClient:
         self._own_session = session is None
         self._token: str | None = None
         self._channel: grpc.aio.Channel | None = None
+        self._device_families: dict[tuple[str, int], str] = {}
 
     # ---------------- REST ----------------
     async def _sess(self) -> aiohttp.ClientSession:
@@ -314,13 +340,15 @@ class InnovaClient:
             raise InnovaError(f"{code}: {e.details()}") from e
 
     async def get_state(self, mac: str, node_id: int = 0) -> AcState:
-        """Read AC state. Raises InnovaDeviceOffline if the unit isn't reachable."""
+        """Read device state. Raises InnovaDeviceOffline if the unit is unreachable."""
         resp = await self._send(_build_get_state(mac, node_id))
         top = _fields(resp)
         if 1 in top and 2 not in top:  # error wrapper (e.g. code 1 = RESPONSE_TIMEOUT)
             raise InnovaDeviceOffline("cloud could not reach the unit")
         try:
-            return _parse_ac_state(resp)
+            state = _parse_state(resp)
+            self._device_families[(mac.lower(), node_id)] = state.family
+            return state
         except Exception as err:
             _LOGGER.debug("Unparseable get_state for %s: %s (raw=%s)", mac, err, resp.hex())
             raise InnovaDeviceOffline(f"unparseable state: {err}") from err
@@ -336,7 +364,7 @@ class InnovaClient:
         fan_speed: int | None = None,
         flap_swing: bool | None = None,
     ) -> None:
-        """SendDevice{ac.set_state{...}} — only provided fields are sent."""
+        """Send set_state for the detected device family; only provided fields are sent."""
         ss = b""
         if power is not None:
             ss += _vint(1, 1 if power else 0)
@@ -348,7 +376,13 @@ class InnovaClient:
             ss += _vint(4, fan_speed)
         if flap_swing is not None:
             ss += _vint(5, 1 if flap_swing else 0)
-        await self._send(_build_set_state(mac, node_id, ss))
+        key = (mac.lower(), node_id)
+        family = self._device_families.get(key)
+        if family is None:
+            await self.get_state(mac, node_id)
+            family = self._device_families.get(key, "ac")
+
+        await self._send(_build_set_state(mac, node_id, ss, family))
 
     async def close(self) -> None:
         if self._channel is not None:

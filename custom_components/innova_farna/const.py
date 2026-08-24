@@ -48,3 +48,25 @@ FAN_TO_HA: dict[int, str] = {
     5: FAN_MAX,
 }
 HA_TO_FAN: dict[str, int] = {v: k for k, v in FAN_TO_HA.items()}
+
+# --- FARNA / fan-coil mappings, confirmed live ------------------------------
+FARNA_HVAC_MODE_TO_HA: dict[int, HVACMode] = {
+    1: HVACMode.AUTO,
+    2: HVACMode.HEAT,
+    3: HVACMode.COOL,
+}
+FARNA_HA_TO_HVAC_MODE: dict[HVACMode, int] = {
+    v: k for k, v in FARNA_HVAC_MODE_TO_HA.items()
+}
+
+FARNA_FAN_MIN = "min"
+FARNA_FAN_MAX = "max"
+
+FARNA_FAN_TO_HA: dict[int, str] = {
+    1: FAN_AUTO,
+    2: FARNA_FAN_MIN,
+    4: FARNA_FAN_MAX,
+}
+FARNA_HA_TO_FAN: dict[str, int] = {
+    v: k for k, v in FARNA_FAN_TO_HA.items()
+}
