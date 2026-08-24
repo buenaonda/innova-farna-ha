@@ -197,14 +197,22 @@ def _parse_state(resp: bytes) -> AcState:
     s = _fields(_one(s, 2))
 
     # AC units use field 1, FARNA/fan-coil units use field 2.
+    #
+    # La familia se decide por PRESENCIA, no por descarte: si no está ninguno de
+    # los dos, se levanta la excepción y `get_state` la traduce a
+    # InnovaDeviceOffline. Sin esto, una respuesta con forma desconocida caía en
+    # la rama fan-coil con el bloque vacío y el equipo aparecía en HA "apagado y
+    # sin temperatura" — un estado plausible y falso, peor que un error visible.
     state_block = _one(s, 1)
     if state_block is not None:
         family = "ac"
     else:
         state_block = _one(s, 2)
+        if state_block is None:
+            raise ValueError("state block missing on both field 1 (ac) and 2 (fancoil)")
         family = "fancoil"
 
-    ac = _fields(state_block or b"")
+    ac = _fields(state_block)
 
     tb = _fields(_one(ac, 3) or b"")
     mode = _fields(_one(ac, 4) or b"")
