@@ -7,8 +7,9 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfTemperature
+from homeassistant.const import SIGNAL_STRENGTH_DECIBELS_MILLIWATT, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
@@ -40,7 +41,11 @@ async def async_setup_entry(
         if not nuevos:
             return
         vistos.update((d.mac_address, d.node_id) for d in nuevos)
-        async_add_entities(InnovaTemperatureSensor(coordinator, dev) for dev in nuevos)
+        entities = []
+        for dev in nuevos:
+            entities.append(InnovaTemperatureSensor(coordinator, dev))
+            entities.append(InnovaWifiSignalSensor(coordinator, dev))
+        async_add_entities(entities)
 
     entry.async_on_unload(coordinator.async_add_listener(_agregar_nuevos))
     _agregar_nuevos()
@@ -62,3 +67,22 @@ class InnovaTemperatureSensor(InnovaEntity, SensorEntity):
     def native_value(self) -> float | None:
         st = self._state
         return st.current_temperature if st else None
+
+
+class InnovaWifiSignalSensor(InnovaEntity, SensorEntity):
+    """Wi-Fi signal strength reported by the unit."""
+
+    _attr_name = "Wi-Fi signal"
+    _attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
+    _attr_native_unit_of_measurement = SIGNAL_STRENGTH_DECIBELS_MILLIWATT
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator, device) -> None:
+        super().__init__(coordinator, device)
+        self._attr_unique_id = f"{device.mac_address}_{device.node_id}_wifi_signal"
+
+    @property
+    def native_value(self) -> int | None:
+        st = self._state
+        return st.wifi_rssi if st else None

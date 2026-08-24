@@ -22,6 +22,10 @@ from .const import (
     HA_TO_FAN,
     HA_TO_HVAC_MODE,
     HVAC_MODE_TO_HA,
+    FARNA_FAN_TO_HA,
+    FARNA_HA_TO_FAN,
+    FARNA_HA_TO_HVAC_MODE,
+    FARNA_HVAC_MODE_TO_HA,
     MAX_TEMP,
     MIN_TEMP,
     TARGET_TEMP_STEP,
@@ -65,8 +69,25 @@ class InnovaClimate(InnovaEntity, ClimateEntity):
 
     _attr_name = None
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
-    _attr_hvac_modes = [HVACMode.OFF, *HVAC_MODE_TO_HA.values()]
-    _attr_fan_modes = list(FAN_TO_HA.values())
+    @property
+    def hvac_modes(self) -> list[HVACMode]:
+        st = self._state
+        mapping = (
+            FARNA_HVAC_MODE_TO_HA
+            if st is not None and st.family == "fancoil"
+            else HVAC_MODE_TO_HA
+        )
+        return [HVACMode.OFF, *mapping.values()]
+
+    @property
+    def fan_modes(self) -> list[str]:
+        st = self._state
+        mapping = (
+            FARNA_FAN_TO_HA
+            if st is not None and st.family == "fancoil"
+            else FAN_TO_HA
+        )
+        return list(mapping.values())
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.FAN_MODE
@@ -115,7 +136,10 @@ class InnovaClimate(InnovaEntity, ClimateEntity):
     @property
     def fan_mode(self) -> str | None:
         st = self._state
-        return FAN_TO_HA.get(st.fan_speed) if st else None
+        if st is None:
+            return None
+        mapping = FARNA_FAN_TO_HA if st.family == "fancoil" else FAN_TO_HA
+        return mapping.get(st.fan_speed)
 
     async def _command(self, optimistic: dict[str, Any], **kwargs: Any) -> None:
         """Send a set_state, optimistically update local state, then refresh."""
@@ -141,15 +165,34 @@ class InnovaClimate(InnovaEntity, ClimateEntity):
         if hvac_mode == HVACMode.OFF:
             await self._command({"power": False}, power=False)
         else:
+            st = self._state
+            mapping = (
+                FARNA_HA_TO_HVAC_MODE
+                if st is not None and st.family == "fancoil"
+                else HA_TO_HVAC_MODE
+            )
+            mode = mapping.get(hvac_mode)
+            if mode is None:
+                raise HomeAssistantError(f"Unsupported HVAC mode: {hvac_mode}")
             await self._command(
-                {"power": True, "hvac_mode": HA_TO_HVAC_MODE.get(hvac_mode)},
+                {"power": True, "hvac_mode": mode},
                 power=True,
-                hvac_mode=HA_TO_HVAC_MODE.get(hvac_mode),
+                hvac_mode=mode,
             )
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
+        st = self._state
+        mapping = (
+            FARNA_HA_TO_FAN
+            if st is not None and st.family == "fancoil"
+            else HA_TO_FAN
+        )
+        fan = mapping.get(fan_mode)
+        if fan is None:
+            raise HomeAssistantError(f"Unsupported fan mode: {fan_mode}")
         await self._command(
-            {"fan_speed": HA_TO_FAN.get(fan_mode)}, fan_speed=HA_TO_FAN.get(fan_mode)
+            {"fan_speed": fan},
+            fan_speed=fan,
         )
 
     async def async_turn_on(self) -> None:
